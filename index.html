@@ -7,10 +7,59 @@
 		
 		<script type="text/javascript">
 			var mouse = {target: null};
-			var timeline = {currentFrame: -1, frames: []};
+			
+			var timeline = {currentFrame: -1, frames: [], lastFrame: -1};
+			timeline.export = function(options) {
+				options = options || {};
+				
+				options.format = options.format || "json";
+				
+				switch(options.format) {
+					case "json":
+						var out = [];
+						
+						for(var i = 0; i < timeline.frames.length; i++) {
+							out.push(timeline.frames[i].export());
+							
+						};
+						
+						return "[" + out.join(", ") + "]";
+					
+				};
+				
+			};
+			timeline.import = function(options) {
+				if(timeline.frames.length > 1) return false;
+				
+				options = options || {};
+				
+				options.format = options.format || "json";
+				options.data = options.data || "";
+				
+				switch(options.format) {
+					case "json":
+						options.data = typeof(options.data) == "string" ? eval("(" + options.data + ")") : options.data;
+						
+						for(var i = 0; i < options.data.length - 1; i++) jQuery("#addFrame_btn").click();
+						
+						for(var i = 0; i < options.data.length; i++) {
+							goToFrame(i + 1);
+							timeline.frames[i].import({data: options.data[i], format: "json"});
+							
+						};
+						break;
+					
+					default:
+						return false;
+						
+				};
+				
+				initShapes();
+				
+			};
 			
 			var Frame = function() {
-				this.shapes = [];
+				this.shapes = {};
 				
 				this.clear = function() {
 					jQuery(this.shapes).each(function() {
@@ -20,15 +69,56 @@
 					
 				};
 				
-				this.serialize = function() {
-						var out = [];
-						
-						for(var i in this.shapes) {
-							out.push(this.shapes[i].serialize());
+				this.export = function(options) {
+					options = options || {};
+					
+					options.format = options.format || "json";
+					
+					switch(options.format) {
+						case "json":
+							var out = [];
 							
-						};
+							for(var i in this.shapes) {
+								out.push(this.shapes[i].serialize());
+								
+							};
+							
+							return "[" + out.join(", ") + "]";
 						
-						return "[" + out.join(", ") + "]";
+						default:
+							return false;
+							
+					};
+					
+				};
+				
+				this.import = function(options) {
+					options = options || {};
+					
+					options.format = options.format ? options.format.toLowerCase() : "json";
+					options.data = typeof(options.data) == "string" ? eval("(" + options.data + ")") : options.data;
+					options.uniqueIds = options.uniqueIds || false;
+					
+					switch(options.format) {
+						case "json":
+							var new_shapes = typeof(options.data) == "string" ? eval("(" + options.data + ")") : options.data;
+							
+							for(var i = 0; i < new_shapes.length; i++) {
+								if(options.uniqueIds) new_shapes[i].id = null;
+								
+								var s = new shapes.Square(new_shapes[i]);
+								
+								timeline.frames[timeline.currentFrame].shapes[s.id.replace(/[\.|#]/, "")] = s;
+								
+							};
+							break;
+							
+						default:
+							return false;
+							
+					};
+						
+					initShapes();
 					
 				};
 				
@@ -90,51 +180,6 @@
 				};
 				
 			};
-			shapes.export = function(options) {
-				var options = options || {};
-				
-				options.format = options.format ? options.format.toLowerCase() : "json";
-				
-				switch(options.format) {
-					case "json":
-						var out = [];
-						
-						for(var i in this.list) {
-							out.push(this.list[i].serialize());
-							
-						};
-						
-						return "[" + out.join(", ") + "]";
-						
-				};
-				
-			};
-			shapes.import = function(options) {
-				options = options || {};
-				
-				options.format = options.format ? options.format.toLowerCase() : "json";
-				options.data = options.data || "";
-				
-				switch(options.format) {
-					case "json":
-						var new_shapes = eval("(" + (options.data || "") + ")");
-						
-						for(var i = 0; i < new_shapes.length; i++) {
-							var s = new this.Square(new_shapes[i]);
-							
-							this.list[s.id.replace(/[\.|#]/, "")] = s;
-							
-						};
-						break;
-						
-					default:
-						return false;
-						
-				};
-					
-				initShapes();
-				
-			};
 			
 			jQuery(document).ready(function() {
 				jQuery().mousemove(function(e) {
@@ -171,6 +216,16 @@
 					
 				}).click();
 				
+				jQuery("#timeline_import").click(function() {
+					timeline.import({data: jQuery("#timeline_data").val(), format: "json"});
+					
+				});
+				
+				jQuery("#timeline_export").click(function() {
+					jQuery("#timeline_data").val(timeline.export());
+					
+				});
+				
 				goToFrame(1);
 				
 			});
@@ -184,9 +239,28 @@
 			};
 			
 			function goToFrame(obj) {
+				timeline.lastFrame = timeline.currentFrame;
+				
 				var frame = timeline.currentFrame = typeof(obj) == "number" ? obj - 1 : Number(jQuery(obj).val().match(/\d+/)[0]) - 1;
 				
 				jQuery("#timeline_current_frame #txt").html(timeline.currentFrame + 1);
+				
+				if(timeline.lastFrame > -1) {
+					var oldShapes = timeline.frames[timeline.lastFrame].shapes || {};
+					
+					for(var i in oldShapes) {
+						jQuery(oldShapes[i].id).hide();
+						
+					};
+					
+				};
+				
+				var currentShapes = timeline.frames[timeline.currentFrame].shapes || {};
+				
+				for(var i in currentShapes) {
+					jQuery(currentShapes[i].id).show();
+					
+				};
 				
 			};
 			
@@ -227,6 +301,12 @@
 		</div>
 		<div class="palette">
 			<input type="button" value="Add Square" id="addSquare" />
+		</div>
+		<div style="text-align: center;">
+			<textarea id="timeline_data" style="display: block; width: 80%; height: 90px; border: solid 1px black; margin: 1em auto 1em auto;">
+			</textarea>
+			<input type="button" value="Import" id="timeline_import" />
+			<input type="button" value="Export" id="timeline_export" />
 		</div>
 	</body>
 </html>
