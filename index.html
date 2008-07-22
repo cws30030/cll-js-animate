@@ -1,0 +1,232 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN" "http://www.w3.org/TR/html4/loose.dtd">
+<html >
+	<head >
+		<title >CLL:JS:Timeline</title>
+		
+		<script type="text/javascript" src="scripts/jquery/jquery-1.2.6.js"></script>
+		
+		<script type="text/javascript">
+			var mouse = {target: null};
+			var timeline = {currentFrame: -1, frames: []};
+			
+			var Frame = function() {
+				this.shapes = [];
+				
+				this.clear = function() {
+					jQuery(this.shapes).each(function() {
+						jQuery(this).hide();
+						
+					});
+					
+				};
+				
+				this.serialize = function() {
+						var out = [];
+						
+						for(var i in this.shapes) {
+							out.push(this.shapes[i].serialize());
+							
+						};
+						
+						return "[" + out.join(", ") + "]";
+					
+				};
+				
+			};
+			
+			var shapes = {};
+			shapes.list = {};
+			shapes.Square = function(options) {
+				options = options || {};
+				
+				this.x = options.x || 20;
+				this.y = options.y || 20;
+				this.scope = options.scope || "body";
+				this.id = options.id || "#square_" + Math.round(Math.random() * 99999);
+				this.class = options.class || "square";
+				this.width = options.width || 20;
+				this.height = options.height || 20;
+				this.backgroundColor = options.backgroundColor || "#439C53";
+				
+				jQuery(this.scope).append('<div class="' + this.class + '" id="' + this.id.replace(/[\.|#]/, "") + '"></div>');
+				
+				this.attr = function(options) {
+					options = options || {};
+					
+					this.x = options.x || this.x;
+					this.y = options.y || this.y;
+					this.id = options.id || this.id;
+					this.class = options.class || this.class;
+					this.width = options.width || this.width;
+					this.height = options.height || this.height;
+					this.backgroundColor = options.backgroundColor || this.backgroundColor;
+					
+					jQuery(document.getElementById(this.id.replace(/[\.|#]/, ""))).css({
+						left: (this.x - this.width / 2) + "px",
+						top: (this.y - this.height / 2) + "px",
+						width: this.width,
+						height: this.height,
+						backgroundColor: this.backgroundColor,
+						width: this.width + "px",
+						height: this.height + "px"
+						
+					});
+					
+				};
+				this.attr();
+				
+				this.serialize = function() {
+					var out = [];
+					
+					for(var i in this) {
+						if(typeof(this[i]) == "function") continue;
+						
+						out.push("'" + i + "': '" + this[i] + "'");
+						
+					};
+					
+					return "{" + out.join(", ") + "}";
+					
+				};
+				
+			};
+			shapes.export = function(options) {
+				var options = options || {};
+				
+				options.format = options.format ? options.format.toLowerCase() : "json";
+				
+				switch(options.format) {
+					case "json":
+						var out = [];
+						
+						for(var i in this.list) {
+							out.push(this.list[i].serialize());
+							
+						};
+						
+						return "[" + out.join(", ") + "]";
+						
+				};
+				
+			};
+			shapes.import = function(options) {
+				options = options || {};
+				
+				options.format = options.format ? options.format.toLowerCase() : "json";
+				options.data = options.data || "";
+				
+				switch(options.format) {
+					case "json":
+						var new_shapes = eval("(" + (options.data || "") + ")");
+						
+						for(var i = 0; i < new_shapes.length; i++) {
+							var s = new this.Square(new_shapes[i]);
+							
+							this.list[s.id.replace(/[\.|#]/, "")] = s;
+							
+						};
+						break;
+						
+					default:
+						return false;
+						
+				};
+					
+				initShapes();
+				
+			};
+			
+			jQuery(document).ready(function() {
+				jQuery().mousemove(function(e) {
+					if(mouse.target) {
+						mouse.target.attr({x: e.pageX, y: e.pageY});
+						
+					};
+					
+				}).mouseup(function() {
+					mouse.target = null;
+					
+				});
+				
+				jQuery("#addSquare").click(function() {
+					if(timeline.currentFrame < 0) return false;
+					
+					var s = new shapes.Square({scope: "#canvas", x: jQuery("#canvas").offset().left + 15, y: jQuery("#canvas").offset().top + 15, backgroundColor: (Math.round(0xFFFFFF * Math.random()).toString(16) + "0").replace(/([a-f0-9]{6}).+/, "#$1").toUpperCase()});
+					
+					timeline.frames[timeline.currentFrame].shapes[s.id.replace(/[\.|#]/, "")] = s;
+					
+					initShapes();
+					
+				});
+				
+				jQuery("#addFrame_btn").click(function() {
+					jQuery("#timeline_frames input").each(function(i) {
+						jQuery(this).val("_" + (i + 1) + "_");
+						
+					});
+					
+					timeline.frames.push(new Frame());
+					
+					jQuery("#timeline_frames").append('<input type="button" onclick="goToFrame(this);" value="_' + (timeline.frames.length) + '_" />');
+					
+				}).click();
+				
+				goToFrame(1);
+				
+			});
+			
+			function initShapes() {
+				jQuery(".square").unbind().mousedown(function() {
+					if(!mouse.target) mouse.target = timeline.frames[timeline.currentFrame].shapes[this.id.replace(/[\.|#]/, "")];
+					
+				});
+				
+			};
+			
+			function goToFrame(obj) {
+				var frame = timeline.currentFrame = typeof(obj) == "number" ? obj - 1 : Number(jQuery(obj).val().match(/\d+/)[0]) - 1;
+				
+				jQuery("#timeline_current_frame #txt").html(timeline.currentFrame + 1);
+				
+			};
+			
+		</script>
+		
+		<style type="text/css">
+			div#canvas {
+				width: 300px;
+				height: 300px;
+				background-color: #DAE8F2;
+				margin: auto;
+				
+			}
+			
+			div#canvas div.square {
+				position: absolute;
+				
+			}
+			
+		</style>
+	</head>
+	<body >
+		<div id="timeline">
+			<div >
+				<input type="button" value="Add Frame" id="addFrame_btn" />
+			</div>
+			<div id="timeline_frames">
+			</div>
+			<div id="timeline_current_frame" style="font-size: 1.4em; text-align: center;">
+				<h3 style="display: inline;">
+					Frame 
+					<span id="txt">
+					</span>
+				</h3>
+			</div>
+		</div>
+		<div id="canvas">
+		</div>
+		<div class="palette">
+			<input type="button" value="Add Square" id="addSquare" />
+		</div>
+	</body>
+</html>
